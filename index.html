@@ -2,13 +2,13 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Word Search Challenge</title>
-
+<title>Advanced Word Search</title>
 <style>
+
 body{
   margin:0;
   font-family:Arial, sans-serif;
-  background:linear-gradient(135deg,#3a7d6a,#5aa38a);
+  background:linear-gradient(135deg,#2f6f5e,#4ca38a);
   display:flex;
   justify-content:center;
   align-items:center;
@@ -18,28 +18,30 @@ body{
 .container{
   background:#f4f4f4;
   padding:30px;
-  border-radius:18px;
-  box-shadow:0 20px 40px rgba(0,0,0,0.25);
+  border-radius:20px;
+  box-shadow:0 25px 50px rgba(0,0,0,0.3);
   width:95%;
-  max-width:900px;
+  max-width:1000px;
   text-align:center;
 }
 
-h1{
-  margin-bottom:20px;
+h1{margin-bottom:10px;}
+
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  margin-bottom:15px;
+  font-weight:bold;
 }
 
 .grid{
   display:grid;
-  grid-template-columns:repeat(12,1fr);
-  gap:6px;
+  gap:5px;
   margin:20px auto;
   touch-action:none;
 }
 
 .cell{
-  width:40px;
-  height:40px;
   background:white;
   border-radius:8px;
   display:flex;
@@ -51,29 +53,29 @@ h1{
   transition:0.2s;
 }
 
-.cell:hover{
-  background:#ddd;
+.cell.selected{
+  background:#90dbf4;
 }
 
-.selected{
-  background:#a2d2ff;
+.found{
+  animation:pop 0.3s ease;
 }
 
-.found1{ background:#ffadad; }
-.found2{ background:#caffbf; }
-.found3{ background:#ffd6a5; }
-.found4{ background:#bdb2ff; }
+@keyframes pop{
+  0%{transform:scale(0.8);}
+  100%{transform:scale(1);}
+}
 
 .words{
-  margin-top:20px;
   display:flex;
   justify-content:center;
   flex-wrap:wrap;
-  gap:15px;
+  gap:12px;
+  margin-top:15px;
 }
 
 .word{
-  padding:8px 14px;
+  padding:6px 12px;
   background:#ddd;
   border-radius:20px;
   font-weight:bold;
@@ -83,59 +85,108 @@ h1{
   text-decoration:line-through;
   opacity:0.5;
 }
+
+button{
+  margin-top:10px;
+  padding:8px 16px;
+  border:none;
+  border-radius:8px;
+  background:#2f6f5e;
+  color:white;
+  cursor:pointer;
+}
+
+canvas{
+  position:fixed;
+  top:0;
+  left:0;
+  pointer-events:none;
+}
+
 </style>
 </head>
-
 <body>
 
 <div class="container">
 <h1>Word Search Challenge</h1>
 
-<div id="grid" class="grid"></div>
-
-<div class="words" id="wordList"></div>
-
+<div class="topbar">
+<div>⏱ Time: <span id="timer">0</span>s</div>
+<div>⭐ Score: <span id="score">0</span></div>
+<div>
+Difficulty:
+<select id="difficulty">
+<option value="10">Easy</option>
+<option value="12" selected>Medium</option>
+<option value="15">Hard</option>
+</select>
 </div>
+</div>
+
+<div id="grid" class="grid"></div>
+<div id="wordList" class="words"></div>
+<button onclick="startGame()">Restart</button>
+</div>
+
+<canvas id="confetti"></canvas>
 
 <script>
 const words = ["ASHUTOSH","SAMYUKHTHA","CHRISTINE","SIMRAN"];
-const gridSize = 12;
+let gridSize = 12;
+let grid=[];
+let selected=[];
+let foundWords=[];
+let startCell=null;
+let timer=0;
+let interval=null;
+let score=0;
 
-const gridElement = document.getElementById("grid");
-const wordList = document.getElementById("wordList");
+const gridEl=document.getElementById("grid");
+const wordList=document.getElementById("wordList");
 
-let grid = [];
-let selectedCells = [];
-let foundCount = 0;
+function startGame(){
+  gridSize=parseInt(document.getElementById("difficulty").value);
+  timer=0;
+  score=0;
+  foundWords=[];
+  document.getElementById("score").textContent=score;
+  document.getElementById("timer").textContent=0;
+  clearInterval(interval);
+  interval=setInterval(()=> {
+    timer++;
+    document.getElementById("timer").textContent=timer;
+  },1000);
 
-function createEmptyGrid(){
+  createGrid();
+}
+
+function createGrid(){
+  grid=[];
   for(let r=0;r<gridSize;r++){
-    grid[r]=[];
-    for(let c=0;c<gridSize;c++){
-      grid[r][c]="";
-    }
+    grid[r]=Array(gridSize).fill("");
   }
+
+  words.forEach(placeWord);
+  fillRandom();
+  renderGrid();
+  renderWords();
 }
 
 function placeWord(word){
+  const dirs=[[0,1],[1,0],[1,1],[-1,1]];
   let placed=false;
-  const directions=[
-    [0,1],[1,0],[1,1],[-1,1]
-  ];
 
   while(!placed){
-    const dir = directions[Math.floor(Math.random()*directions.length)];
-    const row = Math.floor(Math.random()*gridSize);
-    const col = Math.floor(Math.random()*gridSize);
+    let dir=dirs[Math.floor(Math.random()*dirs.length)];
+    let row=Math.floor(Math.random()*gridSize);
+    let col=Math.floor(Math.random()*gridSize);
 
     let fits=true;
-
     for(let i=0;i<word.length;i++){
-      const r = row + dir[0]*i;
-      const c = col + dir[1]*i;
-
-      if(r<0||c<0||r>=gridSize||c>=gridSize|| 
-         (grid[r][c]!=="" && grid[r][c]!==word[i])){
+      let r=row+dir[0]*i;
+      let c=col+dir[1]*i;
+      if(r<0||c<0||r>=gridSize||c>=gridSize||
+        (grid[r][c]!=="" && grid[r][c]!==word[i])){
         fits=false;
         break;
       }
@@ -143,8 +194,8 @@ function placeWord(word){
 
     if(fits){
       for(let i=0;i<word.length;i++){
-        const r = row + dir[0]*i;
-        const c = col + dir[1]*i;
+        let r=row+dir[0]*i;
+        let c=col+dir[1]*i;
         grid[r][c]=word[i];
       }
       placed=true;
@@ -164,20 +215,24 @@ function fillRandom(){
 }
 
 function renderGrid(){
-  gridElement.innerHTML="";
+  gridEl.innerHTML="";
+  gridEl.style.gridTemplateColumns=`repeat(${gridSize},1fr)`;
+
   grid.forEach((row,r)=>{
     row.forEach((letter,c)=>{
       const div=document.createElement("div");
       div.className="cell";
+      div.style.height=(500/gridSize)+"px";
       div.textContent=letter;
       div.dataset.row=r;
       div.dataset.col=c;
-      gridElement.appendChild(div);
+      gridEl.appendChild(div);
     });
   });
 }
 
 function renderWords(){
+  wordList.innerHTML="";
   words.forEach(word=>{
     const div=document.createElement("div");
     div.className="word";
@@ -187,101 +242,119 @@ function renderWords(){
   });
 }
 
-function getWordFromSelection(){
-  return selectedCells.map(cell=>cell.textContent).join("");
+function getDirection(r1,c1,r2,c2){
+  const dr=r2-r1;
+  const dc=c2-c1;
+
+  const stepR=Math.sign(dr);
+  const stepC=Math.sign(dc);
+
+  if(dr===0 || dc===0 || Math.abs(dr)===Math.abs(dc)){
+    return [stepR,stepC];
+  }
+  return null;
 }
 
-function clearSelection(){
-  selectedCells.forEach(c=>c.classList.remove("selected"));
-  selectedCells=[];
+function selectLine(endCell){
+  selected.forEach(c=>c.classList.remove("selected"));
+  selected=[];
+
+  const r1=parseInt(startCell.dataset.row);
+  const c1=parseInt(startCell.dataset.col);
+  const r2=parseInt(endCell.dataset.row);
+  const c2=parseInt(endCell.dataset.col);
+
+  const dir=getDirection(r1,c1,r2,c2);
+  if(!dir) return;
+
+  let r=r1;
+  let c=c1;
+
+  while(true){
+    const cell=document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+    if(cell){
+      cell.classList.add("selected");
+      selected.push(cell);
+    }
+    if(r===r2 && c===c2) break;
+    r+=dir[0];
+    c+=dir[1];
+  }
 }
 
 function checkWord(){
-  const formed=getWordFromSelection();
-  const reversed=formed.split("").reverse().join("");
+  const word=selected.map(c=>c.textContent).join("");
+  const reversed=word.split("").reverse().join("");
 
-  words.forEach((word,index)=>{
-    if(formed===word||reversed===word){
-      selectedCells.forEach(cell=>{
-        cell.classList.add("found"+(index+1));
+  words.forEach(w=>{
+    if((word===w || reversed===w) && !foundWords.includes(w)){
+      selected.forEach(c=>{
+        c.classList.add("found");
+        c.style.background=randomColor();
       });
-      document.getElementById("word-"+word).classList.add("found");
-      foundCount++;
-      if(foundCount===words.length){
-        setTimeout(()=>alert("🎉 All Words Found!"),300);
+      document.getElementById("word-"+w).classList.add("found");
+      foundWords.push(w);
+      score+=100;
+      document.getElementById("score").textContent=score;
+      playSound();
+      if(foundWords.length===words.length){
+        launchConfetti();
+        clearInterval(interval);
       }
     }
   });
 }
 
-let isDragging=false;
+function randomColor(){
+  const colors=["#ffadad","#caffbf","#ffd6a5","#bdb2ff"];
+  return colors[Math.floor(Math.random()*colors.length)];
+}
 
-gridElement.addEventListener("mousedown",e=>{
+let dragging=false;
+
+gridEl.addEventListener("mousedown",e=>{
   if(!e.target.classList.contains("cell")) return;
-  clearSelection();
-  isDragging=true;
-  e.target.classList.add("selected");
-  selectedCells.push(e.target);
+  dragging=true;
+  startCell=e.target;
 });
 
-gridElement.addEventListener("mouseover",e=>{
-  if(isDragging && e.target.classList.contains("cell")){
-    if(!selectedCells.includes(e.target)){
-      e.target.classList.add("selected");
-      selectedCells.push(e.target);
-    }
+gridEl.addEventListener("mouseover",e=>{
+  if(dragging && e.target.classList.contains("cell")){
+    selectLine(e.target);
   }
 });
 
 document.addEventListener("mouseup",()=>{
-  if(isDragging){
+  if(dragging){
     checkWord();
-    isDragging=false;
-    setTimeout(clearSelection,300);
+    selected=[];
+    dragging=false;
   }
 });
 
-/* Mobile */
-gridElement.addEventListener("touchstart",e=>{
-  const target=document.elementFromPoint(
-    e.touches[0].clientX,
-    e.touches[0].clientY
-  );
-  if(target.classList.contains("cell")){
-    clearSelection();
-    isDragging=true;
-    target.classList.add("selected");
-    selectedCells.push(target);
-  }
-});
+/* SOUND */
+function playSound(){
+  const audio=new Audio("https://assets.mixkit.co/sfx/preview/mixkit-game-ball-tap-2073.mp3");
+  audio.play();
+}
 
-gridElement.addEventListener("touchmove",e=>{
-  const target=document.elementFromPoint(
-    e.touches[0].clientX,
-    e.touches[0].clientY
-  );
-  if(isDragging && target.classList.contains("cell")){
-    if(!selectedCells.includes(target)){
-      target.classList.add("selected");
-      selectedCells.push(target);
-    }
-  }
-});
+/* CONFETTI */
+const canvas=document.getElementById("confetti");
+const ctx=canvas.getContext("2d");
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
 
-gridElement.addEventListener("touchend",()=>{
-  if(isDragging){
-    checkWord();
-    isDragging=false;
-    setTimeout(clearSelection,300);
+function launchConfetti(){
+  for(let i=0;i<150;i++){
+    const x=Math.random()*canvas.width;
+    const y=Math.random()*canvas.height/2;
+    ctx.fillStyle=randomColor();
+    ctx.fillRect(x,y,5,10);
   }
-});
+  setTimeout(()=>ctx.clearRect(0,0,canvas.width,canvas.height),2000);
+}
 
-createEmptyGrid();
-words.forEach(placeWord);
-fillRandom();
-renderGrid();
-renderWords();
+startGame();
 </script>
-
 </body>
 </html>
