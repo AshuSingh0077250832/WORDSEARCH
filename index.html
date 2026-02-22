@@ -2,251 +2,285 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Word Search</title>
+<title>Word Search Challenge</title>
 
 <style>
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: linear-gradient(135deg,#1f4037,#99f2c8);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
+body{
+  margin:0;
+  font-family:Arial, sans-serif;
+  background:linear-gradient(135deg,#3a7d6a,#5aa38a);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  min-height:100vh;
 }
 
-.game-container {
-  background: white;
-  padding: 25px;
-  border-radius: 15px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-  text-align: center;
-  width: 95%;
-  max-width: 700px;
+.container{
+  background:#f4f4f4;
+  padding:30px;
+  border-radius:18px;
+  box-shadow:0 20px 40px rgba(0,0,0,0.25);
+  width:95%;
+  max-width:900px;
+  text-align:center;
 }
 
-h1 {
-  margin-top: 0;
+h1{
+  margin-bottom:20px;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: 4px;
-  margin: 20px 0;
+.grid{
+  display:grid;
+  grid-template-columns:repeat(12,1fr);
+  gap:6px;
+  margin:20px auto;
+  touch-action:none;
 }
 
-.cell {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-weight: bold;
-  background: #f0f0f0;
-  border-radius: 6px;
-  cursor: pointer;
-  user-select: none;
+.cell{
+  width:40px;
+  height:40px;
+  background:white;
+  border-radius:8px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  font-weight:bold;
+  cursor:pointer;
+  user-select:none;
+  transition:0.2s;
 }
 
-.cell.selected {
-  background: #ffd166;
+.cell:hover{
+  background:#ddd;
 }
 
-.cell.found {
-  background: #06d6a0;
-  color: white;
+.selected{
+  background:#a2d2ff;
 }
 
-.word-list {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
+.found1{ background:#ffadad; }
+.found2{ background:#caffbf; }
+.found3{ background:#ffd6a5; }
+.found4{ background:#bdb2ff; }
+
+.words{
+  margin-top:20px;
+  display:flex;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:15px;
 }
 
-.word-list span {
-  padding: 5px 10px;
-  background: #eee;
-  border-radius: 6px;
+.word{
+  padding:8px 14px;
+  background:#ddd;
+  border-radius:20px;
+  font-weight:bold;
 }
 
-.word-list .found-word {
-  text-decoration: line-through;
-  background: #06d6a0;
-  color: white;
-}
-
-#message {
-  font-size: 18px;
-  margin-top: 10px;
-  font-weight: bold;
+.word.found{
+  text-decoration:line-through;
+  opacity:0.5;
 }
 </style>
 </head>
 
 <body>
 
-<div class="game-container">
-  <h1>Word Search Challenge</h1>
-  <div class="grid" id="grid"></div>
-  <div class="word-list" id="wordList"></div>
-  <div id="message"></div>
+<div class="container">
+<h1>Word Search Challenge</h1>
+
+<div id="grid" class="grid"></div>
+
+<div class="words" id="wordList"></div>
+
 </div>
 
 <script>
 const words = ["ASHUTOSH","SAMYUKHTHA","CHRISTINE","SIMRAN"];
 const gridSize = 12;
-const grid = document.getElementById("grid");
-const wordListDiv = document.getElementById("wordList");
-const message = document.getElementById("message");
 
-let board = [];
+const gridElement = document.getElementById("grid");
+const wordList = document.getElementById("wordList");
+
+let grid = [];
 let selectedCells = [];
-let isDragging = false;
-let foundWords = [];
+let foundCount = 0;
 
-function init() {
-  createEmptyBoard();
-  placeWords();
-  fillRandomLetters();
-  renderGrid();
-  renderWordList();
+function createEmptyGrid(){
+  for(let r=0;r<gridSize;r++){
+    grid[r]=[];
+    for(let c=0;c<gridSize;c++){
+      grid[r][c]="";
+    }
+  }
 }
 
-function createEmptyBoard() {
-  board = Array(gridSize).fill(null).map(() => Array(gridSize).fill(""));
-}
-
-function placeWords() {
-  const directions = [
-    [0,1], [1,0], [1,1], [-1,1]
+function placeWord(word){
+  let placed=false;
+  const directions=[
+    [0,1],[1,0],[1,1],[-1,1]
   ];
 
-  words.forEach(word => {
-    let placed = false;
+  while(!placed){
+    const dir = directions[Math.floor(Math.random()*directions.length)];
+    const row = Math.floor(Math.random()*gridSize);
+    const col = Math.floor(Math.random()*gridSize);
 
-    while(!placed) {
-      const dir = directions[Math.floor(Math.random()*directions.length)];
-      const row = Math.floor(Math.random()*gridSize);
-      const col = Math.floor(Math.random()*gridSize);
+    let fits=true;
 
-      if(canPlace(word,row,col,dir)) {
-        for(let i=0;i<word.length;i++){
-          board[row + i*dir[0]][col + i*dir[1]] = word[i];
-        }
-        placed = true;
+    for(let i=0;i<word.length;i++){
+      const r = row + dir[0]*i;
+      const c = col + dir[1]*i;
+
+      if(r<0||c<0||r>=gridSize||c>=gridSize|| 
+         (grid[r][c]!=="" && grid[r][c]!==word[i])){
+        fits=false;
+        break;
       }
     }
-  });
-}
 
-function canPlace(word,row,col,dir) {
-  for(let i=0;i<word.length;i++){
-    const r = row + i*dir[0];
-    const c = col + i*dir[1];
-
-    if(r<0||c<0||r>=gridSize||c>=gridSize) return false;
-    if(board[r][c]!=="" && board[r][c]!==word[i]) return false;
+    if(fits){
+      for(let i=0;i<word.length;i++){
+        const r = row + dir[0]*i;
+        const c = col + dir[1]*i;
+        grid[r][c]=word[i];
+      }
+      placed=true;
+    }
   }
-  return true;
 }
 
-function fillRandomLetters() {
-  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+function fillRandom(){
+  const letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   for(let r=0;r<gridSize;r++){
     for(let c=0;c<gridSize;c++){
-      if(board[r][c]===""){
-        board[r][c] = letters[Math.floor(Math.random()*26)];
+      if(grid[r][c]===""){
+        grid[r][c]=letters[Math.floor(Math.random()*letters.length)];
       }
     }
   }
 }
 
-function renderGrid() {
-  grid.innerHTML="";
-  board.forEach((row,r)=>{
+function renderGrid(){
+  gridElement.innerHTML="";
+  grid.forEach((row,r)=>{
     row.forEach((letter,c)=>{
-      const cell=document.createElement("div");
-      cell.classList.add("cell");
-      cell.textContent=letter;
-      cell.dataset.row=r;
-      cell.dataset.col=c;
-
-      cell.addEventListener("mousedown",startSelection);
-      cell.addEventListener("mouseenter",dragSelection);
-      cell.addEventListener("mouseup",endSelection);
-
-      cell.addEventListener("touchstart",startSelection);
-      cell.addEventListener("touchmove",touchDrag);
-      cell.addEventListener("touchend",endSelection);
-
-      grid.appendChild(cell);
+      const div=document.createElement("div");
+      div.className="cell";
+      div.textContent=letter;
+      div.dataset.row=r;
+      div.dataset.col=c;
+      gridElement.appendChild(div);
     });
   });
 }
 
-function renderWordList(){
-  wordListDiv.innerHTML="";
+function renderWords(){
   words.forEach(word=>{
-    const span=document.createElement("span");
-    span.textContent=word;
-    span.id="word-"+word;
-    wordListDiv.appendChild(span);
+    const div=document.createElement("div");
+    div.className="word";
+    div.textContent=word;
+    div.id="word-"+word;
+    wordList.appendChild(div);
   });
 }
 
-function startSelection(e){
-  isDragging=true;
-  selectedCells=[];
-  selectCell(e.target);
+function getWordFromSelection(){
+  return selectedCells.map(cell=>cell.textContent).join("");
 }
 
-function dragSelection(e){
-  if(isDragging) selectCell(e.target);
-}
-
-function touchDrag(e){
-  e.preventDefault();
-  const touch = e.touches[0];
-  const element = document.elementFromPoint(touch.clientX,touch.clientY);
-  if(element && element.classList.contains("cell")){
-    selectCell(element);
-  }
-}
-
-function selectCell(cell){
-  if(!selectedCells.includes(cell)){
-    selectedCells.push(cell);
-    cell.classList.add("selected");
-  }
-}
-
-function endSelection(){
-  isDragging=false;
-  checkWord();
-  selectedCells.forEach(cell=>cell.classList.remove("selected"));
+function clearSelection(){
+  selectedCells.forEach(c=>c.classList.remove("selected"));
   selectedCells=[];
 }
 
 function checkWord(){
-  const word = selectedCells.map(c=>c.textContent).join("");
-  const reverse = word.split("").reverse().join("");
+  const formed=getWordFromSelection();
+  const reversed=formed.split("").reverse().join("");
 
-  words.forEach(w=>{
-    if((word===w || reverse===w) && !foundWords.includes(w)){
-      foundWords.push(w);
-      selectedCells.forEach(c=>c.classList.add("found"));
-      document.getElementById("word-"+w).classList.add("found-word");
+  words.forEach((word,index)=>{
+    if(formed===word||reversed===word){
+      selectedCells.forEach(cell=>{
+        cell.classList.add("found"+(index+1));
+      });
+      document.getElementById("word-"+word).classList.add("found");
+      foundCount++;
+      if(foundCount===words.length){
+        setTimeout(()=>alert("🎉 All Words Found!"),300);
+      }
     }
   });
-
-  if(foundWords.length===words.length){
-    message.textContent="🎉 All words found!";
-  }
 }
 
-init();
+let isDragging=false;
+
+gridElement.addEventListener("mousedown",e=>{
+  if(!e.target.classList.contains("cell")) return;
+  clearSelection();
+  isDragging=true;
+  e.target.classList.add("selected");
+  selectedCells.push(e.target);
+});
+
+gridElement.addEventListener("mouseover",e=>{
+  if(isDragging && e.target.classList.contains("cell")){
+    if(!selectedCells.includes(e.target)){
+      e.target.classList.add("selected");
+      selectedCells.push(e.target);
+    }
+  }
+});
+
+document.addEventListener("mouseup",()=>{
+  if(isDragging){
+    checkWord();
+    isDragging=false;
+    setTimeout(clearSelection,300);
+  }
+});
+
+/* Mobile */
+gridElement.addEventListener("touchstart",e=>{
+  const target=document.elementFromPoint(
+    e.touches[0].clientX,
+    e.touches[0].clientY
+  );
+  if(target.classList.contains("cell")){
+    clearSelection();
+    isDragging=true;
+    target.classList.add("selected");
+    selectedCells.push(target);
+  }
+});
+
+gridElement.addEventListener("touchmove",e=>{
+  const target=document.elementFromPoint(
+    e.touches[0].clientX,
+    e.touches[0].clientY
+  );
+  if(isDragging && target.classList.contains("cell")){
+    if(!selectedCells.includes(target)){
+      target.classList.add("selected");
+      selectedCells.push(target);
+    }
+  }
+});
+
+gridElement.addEventListener("touchend",()=>{
+  if(isDragging){
+    checkWord();
+    isDragging=false;
+    setTimeout(clearSelection,300);
+  }
+});
+
+createEmptyGrid();
+words.forEach(placeWord);
+fillRandom();
+renderGrid();
+renderWords();
 </script>
 
 </body>
