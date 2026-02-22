@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Advanced Word Search</title>
+<title>Word Search Challenge</title>
 <style>
 
 body{
@@ -23,6 +23,7 @@ body{
   width:95%;
   max-width:1000px;
   text-align:center;
+  position:relative;
 }
 
 h1{margin-bottom:10px;}
@@ -36,9 +37,10 @@ h1{margin-bottom:10px;}
 
 .grid{
   display:grid;
-  gap:5px;
+  gap:6px;
   margin:20px auto;
   touch-action:none;
+  position:relative;
 }
 
 .cell{
@@ -53,12 +55,9 @@ h1{margin-bottom:10px;}
   transition:0.2s;
 }
 
-.cell.selected{
-  background:#90dbf4;
-}
-
-.found{
+.cell.found{
   animation:pop 0.3s ease;
+  color:#000;
 }
 
 @keyframes pop{
@@ -87,7 +86,7 @@ h1{margin-bottom:10px;}
 }
 
 button{
-  margin-top:10px;
+  margin-top:15px;
   padding:8px 16px;
   border:none;
   border-radius:8px;
@@ -97,7 +96,7 @@ button{
 }
 
 canvas{
-  position:fixed;
+  position:absolute;
   top:0;
   left:0;
   pointer-events:none;
@@ -113,49 +112,50 @@ canvas{
 <div class="topbar">
 <div>⏱ Time: <span id="timer">0</span>s</div>
 <div>⭐ Score: <span id="score">0</span></div>
-<div>
-Difficulty:
-<select id="difficulty">
-<option value="10">Easy</option>
-<option value="12" selected>Medium</option>
-<option value="15">Hard</option>
-</select>
-</div>
 </div>
 
 <div id="grid" class="grid"></div>
+<canvas id="lineCanvas"></canvas>
+
 <div id="wordList" class="words"></div>
 <button onclick="startGame()">Restart</button>
+
+<audio id="bgMusic" loop>
+<source src="https://cdn.pixabay.com/audio/2022/03/15/audio_1e9a1a8bb0.mp3">
+</audio>
+
 </div>
 
-<canvas id="confetti"></canvas>
-
 <script>
-const words = ["ASHUTOSH","SAMYUKHTHA","CHRISTINE","SIMRAN"];
-let gridSize = 12;
+const words=["ASHUTOSH","SAMYUKHTHA","CHRISTINE","SIMRAN"];
+const gridSize=12;
 let grid=[];
 let selected=[];
 let foundWords=[];
 let startCell=null;
+let dragging=false;
 let timer=0;
-let interval=null;
 let score=0;
+let interval=null;
 
 const gridEl=document.getElementById("grid");
 const wordList=document.getElementById("wordList");
+const canvas=document.getElementById("lineCanvas");
+const ctx=canvas.getContext("2d");
 
 function startGame(){
-  gridSize=parseInt(document.getElementById("difficulty").value);
   timer=0;
   score=0;
   foundWords=[];
-  document.getElementById("score").textContent=score;
+  document.getElementById("score").textContent=0;
   document.getElementById("timer").textContent=0;
   clearInterval(interval);
-  interval=setInterval(()=> {
+  interval=setInterval(()=>{
     timer++;
     document.getElementById("timer").textContent=timer;
   },1000);
+
+  document.getElementById("bgMusic").play();
 
   createGrid();
 }
@@ -186,7 +186,7 @@ function placeWord(word){
       let r=row+dir[0]*i;
       let c=col+dir[1]*i;
       if(r<0||c<0||r>=gridSize||c>=gridSize||
-        (grid[r][c]!=="" && grid[r][c]!==word[i])){
+        (grid[r][c]!==""&&grid[r][c]!==word[i])){
         fits=false;
         break;
       }
@@ -194,9 +194,7 @@ function placeWord(word){
 
     if(fits){
       for(let i=0;i<word.length;i++){
-        let r=row+dir[0]*i;
-        let c=col+dir[1]*i;
-        grid[r][c]=word[i];
+        grid[row+dir[0]*i][col+dir[1]*i]=word[i];
       }
       placed=true;
     }
@@ -207,9 +205,8 @@ function fillRandom(){
   const letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   for(let r=0;r<gridSize;r++){
     for(let c=0;c<gridSize;c++){
-      if(grid[r][c]===""){
+      if(grid[r][c]==="")
         grid[r][c]=letters[Math.floor(Math.random()*letters.length)];
-      }
     }
   }
 }
@@ -217,12 +214,15 @@ function fillRandom(){
 function renderGrid(){
   gridEl.innerHTML="";
   gridEl.style.gridTemplateColumns=`repeat(${gridSize},1fr)`;
+  gridEl.style.width="600px";
+  canvas.width=600;
+  canvas.height=600;
 
   grid.forEach((row,r)=>{
     row.forEach((letter,c)=>{
       const div=document.createElement("div");
       div.className="cell";
-      div.style.height=(500/gridSize)+"px";
+      div.style.height=(600/gridSize)+"px";
       div.textContent=letter;
       div.dataset.row=r;
       div.dataset.col=c;
@@ -233,11 +233,11 @@ function renderGrid(){
 
 function renderWords(){
   wordList.innerHTML="";
-  words.forEach(word=>{
+  words.forEach(w=>{
     const div=document.createElement("div");
     div.className="word";
-    div.textContent=word;
-    div.id="word-"+word;
+    div.id="word-"+w;
+    div.textContent=w;
     wordList.appendChild(div);
   });
 }
@@ -245,41 +245,22 @@ function renderWords(){
 function getDirection(r1,c1,r2,c2){
   const dr=r2-r1;
   const dc=c2-c1;
-
   const stepR=Math.sign(dr);
   const stepC=Math.sign(dc);
-
-  if(dr===0 || dc===0 || Math.abs(dr)===Math.abs(dc)){
+  if(dr===0||dc===0||Math.abs(dr)===Math.abs(dc))
     return [stepR,stepC];
-  }
   return null;
 }
 
-function selectLine(endCell){
-  selected.forEach(c=>c.classList.remove("selected"));
-  selected=[];
-
-  const r1=parseInt(startCell.dataset.row);
-  const c1=parseInt(startCell.dataset.col);
-  const r2=parseInt(endCell.dataset.row);
-  const c2=parseInt(endCell.dataset.col);
-
-  const dir=getDirection(r1,c1,r2,c2);
-  if(!dir) return;
-
-  let r=r1;
-  let c=c1;
-
-  while(true){
-    const cell=document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
-    if(cell){
-      cell.classList.add("selected");
-      selected.push(cell);
-    }
-    if(r===r2 && c===c2) break;
-    r+=dir[0];
-    c+=dir[1];
-  }
+function drawLine(start,end){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.beginPath();
+  ctx.strokeStyle="rgba(0,150,255,0.5)";
+  ctx.lineWidth=8;
+  ctx.lineCap="round";
+  ctx.moveTo(start.x,start.y);
+  ctx.lineTo(end.x,end.y);
+  ctx.stroke();
 }
 
 function checkWord(){
@@ -287,7 +268,7 @@ function checkWord(){
   const reversed=word.split("").reverse().join("");
 
   words.forEach(w=>{
-    if((word===w || reversed===w) && !foundWords.includes(w)){
+    if((word===w||reversed===w)&&!foundWords.includes(w)){
       selected.forEach(c=>{
         c.classList.add("found");
         c.style.background=randomColor();
@@ -296,13 +277,11 @@ function checkWord(){
       foundWords.push(w);
       score+=100;
       document.getElementById("score").textContent=score;
-      playSound();
-      if(foundWords.length===words.length){
-        launchConfetti();
-        clearInterval(interval);
-      }
     }
   });
+
+  selected=[];
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 }
 
 function randomColor(){
@@ -310,48 +289,61 @@ function randomColor(){
   return colors[Math.floor(Math.random()*colors.length)];
 }
 
-let dragging=false;
+gridEl.addEventListener("mousedown",startDrag);
+gridEl.addEventListener("touchstart",startDrag);
 
-gridEl.addEventListener("mousedown",e=>{
-  if(!e.target.classList.contains("cell")) return;
+function startDrag(e){
+  const target=e.target.closest(".cell");
+  if(!target)return;
   dragging=true;
-  startCell=e.target;
-});
-
-gridEl.addEventListener("mouseover",e=>{
-  if(dragging && e.target.classList.contains("cell")){
-    selectLine(e.target);
-  }
-});
-
-document.addEventListener("mouseup",()=>{
-  if(dragging){
-    checkWord();
-    selected=[];
-    dragging=false;
-  }
-});
-
-/* SOUND */
-function playSound(){
-  const audio=new Audio("https://assets.mixkit.co/sfx/preview/mixkit-game-ball-tap-2073.mp3");
-  audio.play();
+  startCell=target;
+  selected=[target];
 }
 
-/* CONFETTI */
-const canvas=document.getElementById("confetti");
-const ctx=canvas.getContext("2d");
-canvas.width=window.innerWidth;
-canvas.height=window.innerHeight;
+gridEl.addEventListener("mousemove",moveDrag);
+gridEl.addEventListener("touchmove",moveDrag);
 
-function launchConfetti(){
-  for(let i=0;i<150;i++){
-    const x=Math.random()*canvas.width;
-    const y=Math.random()*canvas.height/2;
-    ctx.fillStyle=randomColor();
-    ctx.fillRect(x,y,5,10);
+function moveDrag(e){
+  if(!dragging)return;
+  let target=e.target.closest(".cell");
+  if(!target)return;
+
+  const r1=parseInt(startCell.dataset.row);
+  const c1=parseInt(startCell.dataset.col);
+  const r2=parseInt(target.dataset.row);
+  const c2=parseInt(target.dataset.col);
+
+  const dir=getDirection(r1,c1,r2,c2);
+  if(!dir)return;
+
+  selected=[];
+  let r=r1,c=c1;
+  while(true){
+    const cell=document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+    if(cell) selected.push(cell);
+    if(r===r2&&c===c2) break;
+    r+=dir[0];
+    c+=dir[1];
   }
-  setTimeout(()=>ctx.clearRect(0,0,canvas.width,canvas.height),2000);
+
+  const rect1=startCell.getBoundingClientRect();
+  const rect2=target.getBoundingClientRect();
+  drawLine(
+    {x:rect1.left+rect1.width/2-gridEl.getBoundingClientRect().left,
+     y:rect1.top+rect1.height/2-gridEl.getBoundingClientRect().top},
+    {x:rect2.left+rect2.width/2-gridEl.getBoundingClientRect().left,
+     y:rect2.top+rect2.height/2-gridEl.getBoundingClientRect().top}
+  );
+}
+
+document.addEventListener("mouseup",endDrag);
+document.addEventListener("touchend",endDrag);
+
+function endDrag(){
+  if(dragging){
+    checkWord();
+    dragging=false;
+  }
 }
 
 startGame();
